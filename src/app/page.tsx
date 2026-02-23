@@ -1,65 +1,284 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Paintbrush, Users, Sparkles, ArrowRight, Plus, LogIn } from "lucide-react";
+import { useSession } from "@/hooks/useSession";
+import { supabase } from "@/lib/supabase";
+
+
+function generateRoomCode(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const { session, isLoaded, login } = useSession();
+  const [username, setUsername] = useState("");
+  const [roomCode, setRoomCode] = useState("");
+  const [error, setError] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+
+  const handleSetName = () => {
+    if (!username.trim()) {
+      setError("ニックネームを入力してください");
+      return;
+    }
+    if (username.trim().length > 12) {
+      setError("ニックネームは12文字以内で入力してください");
+      return;
+    }
+    login(username.trim());
+    setError("");
+  };
+
+  const handleCreateRoom = async () => {
+    if (!session) return;
+    setIsCreating(true);
+    setError("");
+
+    try {
+      const code = generateRoomCode();
+
+      // 部屋を作成
+      const { data: room, error: roomError } = await supabase
+        .from("rooms")
+        .insert({ room_code: code })
+        .select()
+        .single();
+
+      if (roomError) throw roomError;
+
+      // ホストとして参加
+      const { error: playerError } = await supabase.from("players").insert({
+        id: session.sessionId,
+        room_id: room.id,
+        username: session.username,
+        turn_order: 0,
+        is_host: true,
+      });
+
+      if (playerError) throw playerError;
+
+      router.push(`/room/${room.id}`);
+    } catch (err) {
+      console.error(err);
+      setError("部屋の作成に失敗しました。もう一度お試しください。");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleJoinRoom = async () => {
+    if (!session) return;
+    if (!roomCode.trim()) {
+      setError("ルームコードを入力してください");
+      return;
+    }
+    setIsJoining(true);
+    setError("");
+
+    try {
+      // ルームコードで部屋を検索
+      const { data: room, error: roomError } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("room_code", roomCode.trim())
+        .single();
+
+      if (roomError || !room) {
+        setError("この部屋が見つかりません。コードを確認してください。");
+        return;
+      }
+
+      if (room.status !== "waiting") {
+        setError("この部屋はすでにゲームが始まっています。");
+        return;
+      }
+
+      // 既存の参加者数を確認
+      const { count } = await supabase
+        .from("players")
+        .select("*", { count: "exact", head: true })
+        .eq("room_id", room.id);
+
+      if (count !== null && count >= 8) {
+        setError("この部屋は満員です（最大8人）。");
+        return;
+      }
+
+      // 参加者として登録
+      const { error: playerError } = await supabase.from("players").insert({
+        id: session.sessionId,
+        room_id: room.id,
+        username: session.username,
+        turn_order: count ?? 0,
+        is_host: false,
+      });
+
+      if (playerError) {
+        if (playerError.code === "23505") {
+          // すでに参加済み → そのまま遷移
+          router.push(`/room/${room.id}`);
+          return;
+        }
+        throw playerError;
+      }
+
+      router.push(`/room/${room.id}`);
+    } catch (err) {
+      console.error(err);
+      setError("入室に失敗しました。もう一度お試しください。");
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse text-2xl text-text-muted">読み込み中...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+      {/* Hero Section */}
+      <div className="text-center mb-10 animate-slide-up">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <Paintbrush
+            size={48}
+            className="text-secondary animate-wiggle"
+          />
+          <h1 className="text-5xl md:text-7xl font-extrabold bg-gradient-to-r from-primary-light via-accent-pink to-secondary bg-clip-text text-transparent animate-gradient">
+            Draw-Relay
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <Sparkles
+            size={36}
+            className="text-accent-cyan animate-float"
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        <p className="text-lg md:text-xl text-text-secondary max-w-md mx-auto">
+          みんなで一つの絵を完成させよう！
+          <br />
+          <span className="text-text-muted text-base">
+            2〜8人 × 10秒リレー × リアルタイム
+          </span>
+        </p>
+      </div>
+
+      {/* Main Card */}
+      <div
+        className="glass-card p-8 w-full max-w-md animate-slide-up"
+        style={{ animationDelay: "0.2s" }}
+      >
+        {!session ? (
+          /* ===== Name Input ===== */
+          <div className="space-y-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Users size={22} className="text-primary-light" />
+              <h2 className="text-xl font-bold text-text-primary">
+                ニックネームを入力
+              </h2>
+            </div>
+
+            <input
+              type="text"
+              className="input-field"
+              placeholder="あなたの名前..."
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSetName()}
+              maxLength={12}
+              autoFocus
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+            {error && (
+              <p className="text-accent-pink text-sm font-medium">{error}</p>
+            )}
+
+            <button
+              className="btn-primary w-full flex items-center justify-center gap-2"
+              onClick={handleSetName}
+            >
+              はじめる
+              <ArrowRight size={20} />
+            </button>
+          </div>
+        ) : (
+          /* ===== Room Actions ===== */
+          <div className="space-y-6">
+            <div className="text-center pb-4 border-b border-primary-light/20">
+              <p className="text-text-secondary text-sm">ようこそ</p>
+              <p className="text-2xl font-bold text-secondary">
+                {session.username}
+              </p>
+            </div>
+
+            {error && (
+              <p className="text-accent-pink text-sm font-medium text-center">
+                {error}
+              </p>
+            )}
+
+            {/* Create Room */}
+            <button
+              className="btn-primary w-full flex items-center justify-center gap-2"
+              onClick={handleCreateRoom}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <span className="animate-pulse">作成中...</span>
+              ) : (
+                <>
+                  <Plus size={22} />
+                  部屋をつくる
+                </>
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-primary-light/20" />
+              <span className="text-text-muted text-sm font-medium">
+                または
+              </span>
+              <div className="flex-1 h-px bg-primary-light/20" />
+            </div>
+
+            {/* Join Room */}
+            <div className="space-y-3">
+              <input
+                type="text"
+                className="input-field text-center text-2xl tracking-[0.5em] font-bold"
+                placeholder="1234"
+                value={roomCode}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  setRoomCode(v);
+                }}
+                maxLength={4}
+              />
+              <button
+                className="btn-secondary w-full flex items-center justify-center gap-2"
+                onClick={handleJoinRoom}
+                disabled={isJoining || roomCode.length !== 4}
+              >
+                {isJoining ? (
+                  <span className="animate-pulse">入室中...</span>
+                ) : (
+                  <>
+                    <LogIn size={22} />
+                    コードで入室
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
