@@ -22,7 +22,19 @@ https://drawrelay.vercel.app/
 
 - **3つのユニークなプレイスタイル（ゲームモード）**
   - **ノーマルモード:** 用意されたランダムなお題、または自由入力のお題に対し、各プレイヤーが順番に描き足していきます。
+    <br>
+    <img src="readme_image/ノーマルモード1.png" width="49%">
+    <img src="readme_image/ノーマルモード2.png" width="49%">
+    <br>
+    <img src="readme_image/ノーマルモード3.png" width="49%">
+    <img src="readme_image/ノーマルモード4.png" width="49%">
   - **1人1色モード:** 各プレイヤーがゲーム開始時に自分の「担当カラー」を1色選び、その色だけを使って絵を完成させます。（次の周回で色を変える機能も搭載）
+    <br>
+    <img src="readme_image/カラーモード1.png" width="49%">
+    <img src="readme_image/カラーモード2.png" width="49%">
+    <br>
+    <img src="readme_image/カラーモード3.png" width="49%">
+    <img src="readme_image/カラーモード4.png" width="49%">
   - **いつどこでだれが何をしたモード:** プレイヤー人数に応じて「いつ」「どこで」「だれが」「何をした」などのカテゴリが秘密裏に割り当てられ、各々がお題（プロンプト）を設定します。描く順番が回ってきた人にだけそのカテゴリのお題が明かされていく、カオスなお絵描きリレーです。
 
 - **直感的でモダンなUIデザイン (Glassmorphism)**
