@@ -50,8 +50,8 @@ export default function HomePage() {
 
       if (roomError) throw roomError;
 
-      // ホストとして参加
-      const { error: playerError } = await supabase.from("players").insert({
+      // ホストとして参加 (再プレイ時は更新＝upsert)
+      const { error: playerError } = await supabase.from("players").upsert({
         id: session.sessionId,
         room_id: room.id,
         username: session.username,
@@ -97,6 +97,18 @@ export default function HomePage() {
         return;
       }
 
+      // 自分がすでにこの部屋に参加しているか確認
+      const { data: existingPlayer } = await supabase
+        .from("players")
+        .select("room_id")
+        .eq("id", session.sessionId)
+        .single();
+
+      if (existingPlayer?.room_id === room.id) {
+        router.push(`/room/${room.id}`);
+        return;
+      }
+
       // 既存の参加者数を確認
       const { count } = await supabase
         .from("players")
@@ -108,8 +120,8 @@ export default function HomePage() {
         return;
       }
 
-      // 参加者として登録
-      const { error: playerError } = await supabase.from("players").insert({
+      // 参加者として登録 (再プレイ時は別部屋から移動＝upsert)
+      const { error: playerError } = await supabase.from("players").upsert({
         id: session.sessionId,
         room_id: room.id,
         username: session.username,
@@ -117,14 +129,7 @@ export default function HomePage() {
         is_host: false,
       });
 
-      if (playerError) {
-        if (playerError.code === "23505") {
-          // すでに参加済み → そのまま遷移
-          router.push(`/room/${room.id}`);
-          return;
-        }
-        throw playerError;
-      }
+      if (playerError) throw playerError;
 
       router.push(`/room/${room.id}`);
     } catch (err) {
