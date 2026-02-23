@@ -19,7 +19,6 @@ import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/lib/supabase";
 import Lobby from "@/components/Lobby";
 import GameScreen from "@/components/GameScreen";
-import PromptSetting from "@/components/PromptSetting";
 
 // かんたん：単語・シンプルなお題
 const THEMES_EASY = [
@@ -233,7 +232,7 @@ export default function RoomPage({
       return;
     }
 
-    if (gameMode !== "itsu-doko" && !theme.trim()) {
+    if (!theme.trim()) {
       setError("お題を設定してください。");
       return;
     }
@@ -245,11 +244,11 @@ export default function RoomPage({
       const { error: updateError } = await supabase
         .from("rooms")
         .update({
-          status: gameMode === "itsu-doko" ? "setting_prompts" : "playing",
-          theme: gameMode === "itsu-doko" ? "いつどこでだれが何をした" : theme.trim(),
+          status: "playing",
+          theme: theme.trim(),
           current_turn: 0,
           time_limit: timeLimit,
-          rounds: 1, // itsu-dokoは常に1周
+          rounds: rounds,
           game_mode: gameMode,
           allow_color_change: allowColorChange,
         })
@@ -297,18 +296,6 @@ export default function RoomPage({
     );
   }
 
-  // お題設定中（いつどこでモード）
-  if (room.status === "setting_prompts") {
-    return (
-      <PromptSetting
-        roomId={room.id}
-        players={players}
-        currentPlayerId={session.sessionId}
-        isHost={isHost}
-        onAllPromptsSet={() => {}}
-      />
-    );
-  }
 
   // ゲーム開始済み or 終了 → ゲーム画面
   if (room.status === "playing" || room.status === "finished") {
@@ -376,8 +363,6 @@ export default function RoomPage({
         {/* Host Settings */}
         {isHost && (
           <>
-            {/* Theme Setting - hide for itsu-doko */}
-            {gameMode !== "itsu-doko" && (
             <div
               className="glass-card p-5 animate-slide-up"
               style={{ animationDelay: "0.2s" }}
@@ -416,26 +401,6 @@ export default function RoomPage({
                 </button>
               </div>
             </div>
-            )}
-
-            {/* itsu-doko mode description */}
-            {gameMode === "itsu-doko" && (
-              <div
-                className="glass-card p-5 animate-slide-up"
-                style={{ animationDelay: "0.2s" }}
-              >
-                <h3 className="text-lg font-bold text-text-primary mb-2 flex items-center gap-2">
-                  🎲 いつどこでだれが何をした
-                </h3>
-                <p className="text-sm text-text-muted">
-                  各プレイヤーに「いつ」「どこで」「だれが」などのカテゴリが割り当てられ、秘密のお題を設定します。
-                  描くプレイヤーには順番にお題が明かされます。
-                </p>
-                <p className="text-xs text-text-muted mt-2">
-                  ※ お題と周回数の設定は不要です
-                </p>
-              </div>
-            )}
 
             {/* Game Settings */}
             <div
@@ -547,21 +512,6 @@ export default function RoomPage({
                         gameMode === "one-color" ? "text-white/70" : "text-text-muted"
                       }`}>
                         各自1色で協力
-                      </p>
-                    </button>
-                    <button
-                      onClick={() => setGameMode("itsu-doko")}
-                      className={`flex-1 py-3 px-3 rounded-xl text-sm font-bold transition-all text-center ${
-                        gameMode === "itsu-doko"
-                          ? "bg-primary text-white shadow-lg shadow-primary/30"
-                          : "bg-surface-light text-text-muted hover:text-text-secondary hover:bg-surface-card"
-                      }`}
-                    >
-                      🎲 いつどこで
-                      <p className={`text-xs mt-0.5 font-normal ${
-                        gameMode === "itsu-doko" ? "text-white/70" : "text-text-muted"
-                      }`}>
-                        お題リレー
                       </p>
                     </button>
                   </div>

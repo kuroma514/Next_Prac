@@ -12,10 +12,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import Canvas from "@/components/Canvas";
 import Timer from "@/components/Timer";
-import {
-  getCategoryEmoji,
-  getCategoryColor,
-} from "@/components/PromptSetting";
 
 interface Player {
   id: string;
@@ -41,16 +37,6 @@ interface Stroke {
   path_data: { x: number; y: number }[];
   color: string;
   player_id: string;
-}
-
-interface ItsuDokoPrompt {
-  id: string;
-  room_id: string;
-  category: string;
-  prompt_text: string;
-  setter_id: string;
-  turn_index: number;
-  drawer_id: string | null;
 }
 
 interface GameScreenProps {
@@ -83,29 +69,16 @@ export default function GameScreen({
   const turnDuration = room.time_limit || 10;
   const roundCount = room.rounds || 1;
   const isOneColorMode = room.game_mode === "one-color";
-  const isItsuDokoMode = room.game_mode === "itsu-doko";
-
-  // いつどこでモード用
-  const [itsuDokoPrompts, setItsuDokoPrompts] = useState<ItsuDokoPrompt[]>([]);
 
   const sortedPlayers = [...players].sort(
     (a, b) => a.turn_order - b.turn_order
   );
 
-  // いつどこでモード: プロンプトからターン数と現在のプレイヤーを計算
-  const itsuDokoTotalTurns = isItsuDokoMode ? itsuDokoPrompts.length : 0;
-  const currentItsuDokoPrompt = isItsuDokoMode
-    ? itsuDokoPrompts.find((p) => p.turn_index === currentTurn)
-    : null;
-  const itsuDokoDrawer = currentItsuDokoPrompt?.drawer_id;
-
   // 通常モード/1人1色モードのプレイヤー計算
-  const currentPlayer = isItsuDokoMode
-    ? (itsuDokoDrawer ? players.find((p) => p.id === itsuDokoDrawer) : undefined)
-    : sortedPlayers[currentTurn % sortedPlayers.length];
+  const currentPlayer = sortedPlayers[currentTurn % sortedPlayers.length];
   const isMyTurn = currentPlayer?.id === currentPlayerId;
-  const totalTurns = isItsuDokoMode ? itsuDokoTotalTurns : sortedPlayers.length * roundCount;
-  const currentRound = isItsuDokoMode ? 1 : Math.floor(currentTurn / sortedPlayers.length) + 1;
+  const totalTurns = sortedPlayers.length * roundCount;
+  const currentRound = Math.floor(currentTurn / sortedPlayers.length) + 1;
 
   // 1人1色モード: 周回が変わったら色をリセット（許可時）
   const shouldPickColor = isOneColorMode && isMyTurn && (!colorLocked || (room.allow_color_change && currentRound !== lastColorPickRound));
@@ -137,7 +110,7 @@ export default function GameScreen({
     return () => clearInterval(timer);
   }, [isInterval, gameFinished, currentTurn, shouldPickColor, selectedColor]);
 
-  // 初期ストローク取得 + いつどこでモードのプロンプト取得
+  // 初期ストローク取得
   useEffect(() => {
     const loadData = async () => {
       const { data } = await supabase
@@ -146,20 +119,9 @@ export default function GameScreen({
         .eq("room_id", room.id)
         .order("created_at", { ascending: true });
       if (data) setStrokes(data);
-
-      if (isItsuDokoMode) {
-        const { data: promptData } = await supabase
-          .from("prompts")
-          .select("*")
-          .eq("room_id", room.id)
-          .order("turn_index", { ascending: true });
-        if (promptData) {
-          setItsuDokoPrompts(promptData);
-        }
-      }
     };
     loadData();
-  }, [room.id, isItsuDokoMode, room.current_turn]);
+  }, [room.id, room.current_turn]);
 
   // ストロークのリアルタイム購読
   useEffect(() => {
@@ -428,37 +390,6 @@ export default function GameScreen({
 
           {/* Next player info */}
           <div className="glass-card p-6 max-w-sm mx-auto">
-            {/* いつどこでモード: カテゴリ表示 */}
-            {isItsuDokoMode && currentItsuDokoPrompt ? (
-              <>
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <span className="text-3xl">{getCategoryEmoji(currentItsuDokoPrompt.category)}</span>
-                  <span
-                    className="text-lg font-bold"
-                    style={{ color: getCategoryColor(currentItsuDokoPrompt.category) }}
-                  >
-                    {currentItsuDokoPrompt.category}
-                  </span>
-                </div>
-                <p className="text-2xl font-bold text-text-primary mb-2">
-                  「{currentItsuDokoPrompt.prompt_text}」
-                </p>
-                <p className="text-text-muted text-sm mb-2">
-                  ターン {currentTurn + 1}/{totalTurns}
-                </p>
-                <p className="text-lg font-bold text-text-primary">
-                  {isMyTurn ? (
-                    <span className="text-accent-green">🖌️ あなたが描きます！</span>
-                  ) : (
-                    <span><span className="text-secondary">{currentPlayer?.username}</span> が描きます</span>
-                  )}
-                </p>
-                <p className="text-text-muted text-sm mt-1">
-                  制限時間: {turnDuration}秒
-                </p>
-              </>
-            ) : (
-              <>
                 <p className="text-text-muted text-sm mb-2">
                   {roundCount > 1
                     ? `${currentRound}周目 - ターン ${(currentTurn % sortedPlayers.length) + 1}/${sortedPlayers.length}`
@@ -483,8 +414,6 @@ export default function GameScreen({
                     />
                   </div>
                 )}
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -498,31 +427,12 @@ export default function GameScreen({
       <div className="w-full max-w-[500px] mb-4 animate-slide-up">
         <div className="flex items-center justify-between mb-3">
           <div>
-            {isItsuDokoMode && currentItsuDokoPrompt ? (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <span>{getCategoryEmoji(currentItsuDokoPrompt.category)}</span>
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: getCategoryColor(currentItsuDokoPrompt.category) }}
-                  >
-                    {currentItsuDokoPrompt.category}
-                  </p>
-                </div>
-                <p className="text-xl font-bold text-secondary">
-                  「{currentItsuDokoPrompt.prompt_text}」
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-text-muted">お題</p>
-                <p className="text-xl font-bold text-secondary">{room.theme}</p>
-              </>
-            )}
+            <p className="text-sm text-text-muted">お題</p>
+            <p className="text-xl font-bold text-secondary">{room.theme}</p>
           </div>
           <div className="text-right">
             <p className="text-sm text-text-muted">
-              {isItsuDokoMode ? "ターン" : (roundCount > 1 ? `${currentRound}周目` : "ターン")}
+              {roundCount > 1 ? `${currentRound}周目` : "ターン"}
             </p>
             <p className="text-xl font-bold text-text-primary">
               {currentTurn + 1}{" "}
