@@ -558,7 +558,7 @@ export default function GameScreen({
       </div>
 
       {/* Canvas */}
-      <div className="animate-slide-up" style={{ animationDelay: "0.1s" }}>
+      <div className="w-full animate-slide-up" style={{ animationDelay: "0.1s" }}>
         <Canvas
           roomId={room.id}
           playerId={currentPlayerId}

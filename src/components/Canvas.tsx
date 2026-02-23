@@ -218,7 +218,7 @@ export default function Canvas({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-4 w-full">
       {/* Canvas */}
       <div className="relative w-full max-w-[500px]">
         <canvas
